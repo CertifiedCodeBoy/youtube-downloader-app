@@ -69,7 +69,7 @@ def download():
             if fmt == 'mp3' else []
         ),
         'quiet': True,
-        'cookiefile': COOKIE_FILE
+        'cookies':COOKIE_FILE
     }
 
     try:
