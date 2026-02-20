@@ -7,10 +7,11 @@ import tempfile
 app = Flask(__name__)
 CORS(app)
 
+COOKIE_FILE = "/etc/secrets/cookies.txt"
+
 
 @app.route('/')
 def health():
-    # Important for Render health checks
     return "OK", 200
 
 
@@ -20,8 +21,16 @@ def info():
     if not url:
         return jsonify({'error': 'Missing url parameter'}), 400
 
-    with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
-        data = ydl.extract_info(url, download=False)
+    ydl_opts = {
+        'quiet': True,
+        'cookiefile': COOKIE_FILE
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            data = ydl.extract_info(url, download=False)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
     duration_seconds = data.get('duration', 0)
     minutes = int(duration_seconds // 60)
@@ -51,7 +60,7 @@ def download():
 
     tmp = tempfile.mkdtemp()
 
-    opts = {
+    ydl_opts = {
         'format': 'bestaudio/best' if fmt == 'mp3'
                   else f'bestvideo[height<={quality[:-1]}]+bestaudio/best',
         'outtmpl': os.path.join(tmp, '%(title)s.%(ext)s'),
@@ -60,10 +69,14 @@ def download():
             if fmt == 'mp3' else []
         ),
         'quiet': True,
+        'cookiefile': COOKIE_FILE
     }
 
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        ydl.download([url])
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
     file_name = next(os.path.join(tmp, f) for f in os.listdir(tmp))
     return send_file(file_name, as_attachment=True)
